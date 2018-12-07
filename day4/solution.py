@@ -55,12 +55,13 @@ class Event:
 class Guard:
     events: List[Event] = field(default_factory=list)
 
-    def calculate_sleep(self) -> Tuple[int, int]:
+    def calculate_sleep(self) -> Tuple[int, int, int]:
         """Loop through this guard's events.
-        Calculate how many minutes he slept,
-        and which minute occurred the most."""
+        Return how many minutes he slept,
+        which minute he was asleep the most
+        and the occurrences of that minute."""
         if not self.events:
-            return 0, 0
+            return 0, 0, 0
 
         seconds = 0
         minute_occurrences = defaultdict(int)
@@ -77,8 +78,8 @@ class Guard:
                 asleep_since = event.when
 
         minutes = seconds // 60
-        most_occurring = max(minute_occurrences.items(), key=lambda minute_and_count: minute_and_count[1])[0]
-        return minutes, most_occurring
+        most_occurring = max(minute_occurrences.items(), key=lambda minute_and_count: minute_and_count[1])
+        return minutes, most_occurring[0], most_occurring[1]
 
 
 def find_sleepiest_guard(guards: Dict[int, Guard]) -> Tuple[int, int, int]:
@@ -87,7 +88,7 @@ def find_sleepiest_guard(guards: Dict[int, Guard]) -> Tuple[int, int, int]:
     """
     data = []
     for _id, guard in guards.items():
-        minutes, most_occurring = guard.calculate_sleep()
+        minutes, most_occurring, _ = guard.calculate_sleep()
         data.append((_id, minutes, most_occurring))
     return max(data, key=lambda item: item[1])
 
