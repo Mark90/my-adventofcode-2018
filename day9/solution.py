@@ -1,34 +1,52 @@
+"""Updated for part 2.
+
+Using a doubly linked list as python's list insert is O(N)
+Much faster this way, but memory usage peaks at almost 1200MB
+I have no doubt there's a fancy math solution to overcome this. :-)
+"""
 import re
 
 
-def index_to_put(circle, current_marble):
-    """Decide index at which the next marble should be inserted.
-    Marble at that index will be moved clockwise."""
-    if len(circle) == 1:
-        return 1
-    return (current_marble + 2) % (len(circle))
+class Marble:
+    value: int
+    left: 'Marble' = None
+    right: 'Marble' = None
 
+    def __init__(self, value):
+        self.value = value
 
-def index_to_take(circle, current_marble):
-    """Decide index from which a marble should be removed."""
-    return (current_marble - 7) % len(circle)
+    def insert_right(self, marble: 'Marble') -> 'Marble':
+        """Insert marble to the right of this one and return it"""
+        marble.right = self.right
+        self.right.left = marble
+        self.right = marble
+        marble.left = self
+        return marble
+
+    def pop(self) -> 'Marble':
+        """Pop this marble from the chain and return the one taking its place"""
+        self.left.right, self.right.left = self.right, self.left  # ol' switcharoo
+        return self.right
+
+    def get_7_left(self) -> 'Marble':
+        return self.left.left.left.left.left.left.left  # Hm?
 
 
 def play_until(num_players, last_marble):
     scores = {i: 0 for i in range(num_players)}
-    circle = [0]
-    current_marble = current_player = 0
-    for new_marble in range(1, last_marble + 1):
+
+    root = Marble(value=0)
+    root.left = root.right = root
+    current_player = 0
+    for marble_value in range(1, last_marble + 1):
         current_player = (current_player + 1) % num_players
 
-        if (new_marble % 23) == 0:
-            take = index_to_take(circle, current_marble)
-            scores[current_player] += new_marble + circle.pop(take)
-            current_marble = take % len(circle)
+        if (marble_value % 23) == 0:
+            marble_to_take = root.get_7_left()
+            root = marble_to_take.pop()
+            scores[current_player] += marble_value + marble_to_take.value
         else:
-            put = index_to_put(circle, current_marble)
-            circle.insert(put, new_marble)
-            current_marble = put
+            root = root.right.insert_right(Marble(value=marble_value))
     return max(scores.values())
 
 
@@ -53,9 +71,19 @@ def solve():
         question = re.match(r'(\d+) play.+rth (\d+).+', f.read().strip()).groups()
     players, last_marble = map(int, question)
     actual_score = play_until(players, last_marble)
-    print(f'Score with {players} players and {last_marble} marbles: {actual_score}')
+    print(f'[part1] Score with {players} players and {last_marble} marbles: {actual_score}')
+
+
+def solve_part2():
+    with open('input.txt') as f:
+        question = re.match(r'(\d+) play.+rth (\d+).+', f.read().strip()).groups()
+    players, last_marble = map(int, question)
+    last_marble *= 100
+    actual_score = play_until(players, last_marble)
+    print(f'[part2] Score with {players} players and {last_marble} marbles: {actual_score}')
 
 
 if __name__ == '__main__':
     test()
     solve()
+    solve_part2()
