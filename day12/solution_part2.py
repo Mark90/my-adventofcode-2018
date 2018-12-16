@@ -2,7 +2,10 @@
 Been a while I really used them - I was often mixing up the index of a bit and its power of 2.
 Hence the helper functions with doctests to visualize the problem.
 Took ~2h30m to solve it, easy pace.
+
+Excution: ~60ms on an Intel i7 870
 """
+import time
 
 char_to_bit = {
     '#': '1',
@@ -144,6 +147,8 @@ combinations_test = [str_to_int(comb) for comb in [
 ]]
 
 if __name__ == '__main__':
+    t_start = time.time()
+
     start_string, combinations, num_generations = start_string_part2, combinations_part2, num_generations_part2
     # start_string, combinations, num_generations = start_string_test, combinations_test, num_generations_test
 
@@ -161,21 +166,21 @@ if __name__ == '__main__':
     current_sum = sum_of_pots_with_plants(current_number, base_idx)
     current_sumchange = 0
 
-    print(f'START: STATE=[{leftpad(current_number)}]  num_bits={num_bits(current_number)}')
+    # print(f'START: STATE=[{leftpad(current_number)}]  num_bits={num_bits(current_number)}')
     for generation in range(num_generations):
-
-        if generation > 0 and (generation % 1000) == 0:
-            # For lots of generations, we break if the sum changes at a constant rate
+        if generation > 0:
+            # Break if the sum changes at a constant rate
             new_sum = sum_of_pots_with_plants(current_number, base_idx)
             new_sumchange = new_sum - current_sum
-            print(f'GEN={generation:2d}  STATE=[{leftpad(current_number)}]  num_bits={num_bits(current_number)}  '
-                  f' SUM [{current_sum} -> {new_sum}] sumchange {new_sumchange})')
+            # print(f'GEN={generation:2d}  STATE=[{leftpad(current_number)}]  num_bits={num_bits(current_number)}  '
+            #       f' SUM [{current_sum} -> {new_sum}] sumchange {new_sumchange})')
             if current_sumchange == new_sumchange:
                 remaining_generations = num_generations - generation
-                final_sum = int(new_sum + ((remaining_generations / 1000) * new_sumchange))
+                final_sum = int(new_sum + (remaining_generations * new_sumchange))
+                time_needed = (time.time() - t_start) * 1000
                 raise Exception(
                     f'Sum increases at constant rate. Calculated final value after {remaining_generations} more '
-                    f'generations: {final_sum}')
+                    f'generations: {final_sum}. (Took {time_needed:.5f}ms)')
             current_sum = new_sum
             current_sumchange = new_sumchange
 
