@@ -1,7 +1,6 @@
-"""~29sec, pretty slow.."""
+"""~2.3sec"""
 import time
 from collections import defaultdict
-from copy import deepcopy
 
 t_start = time.time()
 
@@ -124,5 +123,5 @@ while True:
         new_grid[newxy] = newfield
 
     # make newgrid the new grid.
-    grid = deepcopy(new_grid)
+    grid = new_grid
     i += 1
