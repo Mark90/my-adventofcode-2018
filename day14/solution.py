@@ -1,5 +1,5 @@
 """
-~1200ms, Python 3.7, Intel i5-7200U
+~1100ms, Python 3.7, Intel i5-7200U
 """
 
 import time
@@ -15,7 +15,6 @@ inp = 864801
 
 created = 2
 for i in range(inp + 10):
-    created += 0
     r1, r2 = allreci[e1], allreci[e2]
 
     nr = r1 + r2
