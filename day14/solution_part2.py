@@ -28,7 +28,5 @@ while True:
     elf2 = (elf2 + 1 + recipe2) % len(recipes_found)
     loop += 1
 
-recipes_before_pattern = len(recipes_found[:recipes_found.index(puzzle)])
-time_needed = (time.time() - t_start) * 1000
-print(f'Completed in {time_needed:.2f}ms\n'
-      f'{"".join(str(c) for c in puzzle)} first appears after {recipes_before_pattern} recipes')
+print(time.time() - t_start)
+print(recipes_found.index(puzzle))
