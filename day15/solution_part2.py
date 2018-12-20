@@ -1,6 +1,8 @@
 """
-~1200ms, Python 3.7, intel i7 870
+~3800ms, Python 3.7, intel i5 7200u
+Min dps is not hardcoded
 """
+import math
 import time
 from dataclasses import dataclass, field
 from typing import List, Tuple, Union, Dict
@@ -8,10 +10,12 @@ from typing import List, Tuple, Union, Dict
 t_start = time.time()
 
 
+@dataclass(repr=False)
 class Creature:
     health: int = 200
     dps: int = 3
     last_moved: int = None
+    elf_dps: int = None
 
     def __repr__(self):
         return f'<{self.__class__.__name__} HP {self.health} lastmoved {self.last_moved}>'
@@ -30,8 +34,16 @@ class Goblin(Creature):
     """Scum of middle earth"""
 
 
+@dataclass(repr=False)
 class Elf(Creature):
-    """Santa's little helpers"""
+    """Santa's tweaked little helpers"""
+
+    def __post_init__(self):
+        self.dps = self.elf_dps
+
+
+class AnElfHasDied(Exception):
+    """Skip this battle because an Elf already died"""
 
 
 @dataclass(order=False, repr=False)
@@ -70,7 +82,8 @@ class Node:
             acting_node.creature.attack(lowest_hp.creature)
             actions += 1
             if lowest_hp.creature.dead():
-                print(f'Round {rounds} - {lowest_hp.creature} at {lowest_hp} died, removing it')
+                if isinstance(lowest_hp.creature, Elf):
+                    raise AnElfHasDied()
                 lowest_hp.creature = None
         return actions
 
@@ -136,45 +149,94 @@ def battle_is_over(cavern: List[Node]) -> bool:
 
 
 def solve(puzzleinput):
-    """Build graph, link the nodes, start the fight"""
-    nodes = {}
-    for y, row in enumerate([i.strip() for i in puzzleinput.splitlines() if i.strip()]):
-        for x, cell in enumerate(row):
-            if cell == '#': continue
-            creature = {'G': Goblin, 'E': Elf}[cell]() if cell in 'GE' else None
-            nodes[(x, y)] = Node((x, y), nodes, creature=creature)
+    """
+    Try to find minimal dps for which Elves win the battle without losses.
+    Say required dps is 32. Start with 3, double it until we overshoot, then backtrack.
 
-    for node in nodes.values():
-        for other in nodes.values():
-            if node is other or other in node.neighbors:
-                continue
-            if abs(node.pos[0] - other.pos[0]) + abs(node.pos[1] - other.pos[1]) == 1:  # MH Dist
-                node.neighbors.append(other)
-                other.neighbors.append(node)
-
-    cavern = [node for node in nodes.values()]
+    dps                       fictive outcomes        left  right (boundaries before round)
+    =======================================================================================
+    3                         lose                    0     Inf
+    3 * 2 = 6                 lose                    3     Inf
+    6 * 2 = 12                win with losses         6     Inf
+    12 * 2 = 24               win with losses         12    Inf
+    24 * 2 = 48               win without losses      24    Inf
+    48 - ((48-24)//2) = 36    win without losses      24    48
+    36 - ((36-24)//2) = 30    win with losses         24    36
+    30 + ((36-30)//2) = 33    win without losses      30    36
+    33 - ((33-30)//2) = 31    win with losses         30    33
+    31 + ((33-31)//2) = 32    win without losses      31    33
+                                                      31    32    done - answer is upperbound
+    """
+    curr_elf_dps = Elf.dps
+    lowerbound, upperbound = 0, math.inf
+    elves = []
     rounds = 0
-    while True:
-        last_action = 0
-        for node in cavern:
-            last_action = node.evaluate(rounds)
+    while lowerbound < curr_elf_dps < upperbound:
+        nodes = {}
+        # Create graph nodes
+        for y, row in enumerate([i.strip() for i in puzzleinput.splitlines() if i.strip()]):
+            for x, cell in enumerate(row):
+                if cell == '#': continue
+                creature = {'G': Goblin, 'E': Elf}[cell](elf_dps=curr_elf_dps) if cell in 'GE' else None
+                nodes[(x, y)] = Node((x, y), nodes, creature=creature)
 
-        if last_action == 0 and (battle_is_over(cavern)):
-            break
-        rounds += 1
+        # Link nodes neighbors
+        for node in nodes.values():
+            for other in nodes.values():
+                if node is other or other in node.neighbors:
+                    continue
+                if abs(node.pos[0] - other.pos[0]) + abs(node.pos[1] - other.pos[1]) == 1:  # MH Dist
+                    node.neighbors.append(other)
+                    other.neighbors.append(node)
 
+        cavern = [node for node in nodes.values()]
+        elves = [node.creature for node in cavern if isinstance(node.creature, Elf)]
+        rounds = 0
+        # Simulate the battle - "cheating" a little bit by dropping out when an elf dies.
+        try:
+            while True:
+                last_action = 0
+                for node in cavern:
+                    last_action = node.evaluate(rounds)
+
+                if last_action == 0 and (battle_is_over(cavern)):
+                    break
+                rounds += 1
+        except AnElfHasDied:
+            pass
+
+        if all(i.dead() for i in elves):
+            battle_result = 'elves lose'
+        else:
+            battle_result = 'elves won with losses' if any(i.dead() for i in elves) else 'elves flawless victory'
+        print(f'{curr_elf_dps:5d}   {battle_result:24s}  {lowerbound:5d}  {upperbound:5}')
+
+        if any(elf.dead() for elf in elves):
+            # if any elf died, we must give them more power!
+            lowerbound = curr_elf_dps
+            if upperbound < math.inf:
+                curr_elf_dps += (upperbound - lowerbound) // 2
+            else:
+                curr_elf_dps *= 2
+        elif all(not elf.dead() for elf in elves):
+            # all elves alive, maybe we are overkilling those gobbies
+            upperbound = curr_elf_dps
+            curr_elf_dps -= (upperbound - lowerbound) // 2
+
+    answer = upperbound
     t_done = (time.time() - t_start) * 1000
-    hitpoints = sum([node.creature.health for node in cavern if node.creature and not node.creature.dead()])
+    hitpoints = sum([elf.health for elf in elves])
     outcome = rounds * hitpoints
-    print(
-        f'Round {rounds}: remaining hitpoints {hitpoints} and outcome {outcome}\nFound in {t_done:.2f}ms')
+    print(f'Round {rounds}: remaining elf hitpoints {hitpoints} with dps {answer} and outcome {outcome}')
+    print(f'Found in {t_done:.2f}ms')
     return outcome
 
 
 def test():
     import glob
     results = []
-    for test in glob.glob('input_*.txt'):
+    testfiles = glob.glob('input_*.txt')
+    for test in testfiles:
         with open(test) as f:
             puzzleinput = f.read()
         expected_outcome = int(''.join(c for c in test if c.isdigit()))
@@ -191,5 +253,5 @@ def part1():
 
 
 if __name__ == '__main__':
-    test()
-    # part1()
+    # test()
+    part1()
