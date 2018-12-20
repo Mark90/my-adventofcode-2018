@@ -48,30 +48,35 @@ class Node:
     def __repr__(self):
         return f'<{self.__class__.__name__} {self.pos}>'
 
-    def evaluate(self, rounds):
+    def evaluate(self, rounds) -> int:
+        """Return number of actions taken"""
         if not self.creature or self.creature.last_moved == rounds:
-            return
+            return 0
 
         shortest_path = self.shortest_path_to_enemy()
         if shortest_path is None:
-            return
+            return 0
 
         next_node, distance, final_node = shortest_path
         acting_node = self
+        actions = 0
         if distance >= 1:
             self.creature.last_moved = rounds
             next_node.creature = self.creature
             self.creature = None
             distance -= 1
             acting_node = next_node
+            actions += 1
 
         if distance == 0:
             lowest_hp = sorted([n for n in acting_node.neighbors if acting_node.contains_enemy(n)],
                                key=lambda i: (i.creature.health, i))[0]
             acting_node.creature.attack(lowest_hp.creature)
+            actions += 1
             if lowest_hp.creature.dead():
                 print(f'Round {rounds} - {lowest_hp.creature} at {lowest_hp} died, removing it')
                 lowest_hp.creature = None
+        return actions
 
     def contains_enemy(self, other_node: 'Node') -> bool:
         return other_node.creature is not None and other_node.creature.is_enemy_of(self.creature)
@@ -129,6 +134,11 @@ class Node:
         return not self.__eq__(other)
 
 
+def battle_is_over(cavern: List[Node]) -> bool:
+    return all(n.creature.dead() for n in cavern if isinstance(n.creature, Goblin)) \
+           or all(n.creature.dead() for n in cavern if isinstance(n.creature, Elf))
+
+
 def solve(puzzleinput):
     """Build graph, link the nodes, start the fight"""
     nodes = {}
@@ -149,10 +159,11 @@ def solve(puzzleinput):
     cavern = [node for node in nodes.values()]
     rounds = 0
     while True:
+        last_action = 0
         for node in cavern:
-            node.evaluate(rounds)
-        if all(n.creature.dead() for n in nodes.values() if isinstance(n.creature, Goblin)) \
-                or all(n.creature.dead() for n in nodes.values() if isinstance(n.creature, Elf)):
+            last_action = node.evaluate(rounds)
+
+        if last_action == 0 and (battle_is_over(cavern)):
             break
         rounds += 1
 
@@ -165,7 +176,6 @@ def solve(puzzleinput):
 
 
 def test():
-    """27730 fails for some reason, number of rounds is always off by one"""
     import glob
     results = []
     for test in glob.glob('input_*.txt'):
@@ -185,5 +195,5 @@ def part1():
 
 
 if __name__ == '__main__':
-    # test()
-    part1()
+    test()
+    # part1()
